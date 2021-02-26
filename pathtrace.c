@@ -5,20 +5,16 @@
 
 // Include Custom Utilities
 #include "targa.h"
-#include "rng.h"
-#include "vectormath.h"
+#include "custommath.h"
 
-#define samples     (unsigned int) 1024U
-#define resolutionx (unsigned int) 320U
-#define resolutiony (unsigned int) 240U
-#define maxmarches  (unsigned int) 128U
+// Parameters
+#define samples     256U
+#define resolutionx 320U
+#define resolutiony 240U
+#define maxmarches  128U
 #define collisiondist 0.01
 #define scenesize 32.0
 #define camfov 1.0
-
-// Classic "Unsafe" Minimum and Maximum Functions
-#define MIN(a, b) (a < b ? a : b)
-#define MAX(a, b) (a > b ? a : b)
 
 float distestimator(vec3 pos){
     return vector3Length(pos)-0.5;
@@ -29,7 +25,7 @@ float light(vec3 pos){
 }
 
 vec3 pathtrace(vec3 raydir, vec3 rayori){
-    vec3 lastpos = rayori, raypos = rayori;
+    vec3 raypos = rayori, lastpos = rayori, normal;
     float distest;
     for(unsigned int i = 0U; i < maxmarches; i++){
         if(vector3Length(raypos) > scenesize){break;}
@@ -38,21 +34,22 @@ vec3 pathtrace(vec3 raydir, vec3 rayori){
         }
         distest = distestimator(raypos);
         if(distest < collisiondist){
+            normal = normalize(raypos);
             // TODO: Spherically Uniform Random- Right now this is Basically a Cube which is Incorrect
-            raydir = normalize(float3(rand()-0.5, rand()-0.5, rand()-0.5));
+            raydir = reflect(raydir, normalize(vec3Add(normal, vec3Mult(floatf3(2.0), float3(random()-0.5, random()-0.5, random()-0.5)))));
             raypos = lastpos;
         }
         lastpos = raypos;
-        raypos = vec3Add(raypos, vec3Mult(raydir, floatf3(0.5*MIN(distest, light(raypos)))));
+        raypos = vec3Add(raypos, vec3Mult(raydir, floatf3(min(distest, light(raypos)))));
     }
     return floatf3(0.0);
 }
 
 int main(){
     // Set-Up Variables
-    unsigned int resolutionmax = MAX(resolutionx, resolutiony), byte = 0U;
-    vec3 raydir, outCol;
-    float uvx, uvy;
+    unsigned int resolutionmax = max(resolutionx, resolutiony), byte = 0U;
+    vec3 raydir, normal, outCol;
+    vec2 uv;
     uint8_t imageBuffer[resolutionx * resolutiony * 3U] = {0U};
 
     // Execute Rendering
@@ -61,16 +58,15 @@ int main(){
         // Monte-Carlo Rendering
         for(unsigned int sample = 0U; sample < samples; sample++){
             INIT_RNG;
-            uvx = 2.0*((x+0.5)-0.5*resolutionx)/resolutionmax;
-            uvy = 2.0*((y+0.5)-0.5*resolutiony)/resolutionmax;
-            raydir = normalize(float3(uvx*camfov, uvy*camfov, 1.0));
+            uv = float2(2.0*((x+0.5)-0.5*resolutionx)/resolutionmax, 2.0*((y+0.5)-0.5*resolutiony)/resolutionmax);
+            raydir = normalize(float3(uv.x*camfov, uv.y*camfov, 1.0));
             outCol = vec3Add(outCol, vec3Mult(pathtrace(raydir, float3(0.0, 0.0, -2.0)), floatf3(32.0)));
         }
         outCol = vec3Div(outCol, floatf3(samples));
-        imageBuffer[byte   ] = MAX(0U, MIN(255U, round(outCol.x*255U)));
-        imageBuffer[byte+1U] = MAX(0U, MIN(255U, round(outCol.y*255U)));
-        imageBuffer[byte+2U] = MAX(0U, MIN(255U, round(outCol.z*255U)));
-        byte += 3;
+        imageBuffer[byte   ] = clamp(round(outCol.z*255U), 0U, 255U);
+        imageBuffer[byte+1U] = clamp(round(outCol.y*255U), 0U, 255U);
+        imageBuffer[byte+2U] = clamp(round(outCol.x*255U), 0U, 255U);
+        byte += 3U;
     }
     }
 
