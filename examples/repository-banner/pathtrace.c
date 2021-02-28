@@ -9,11 +9,11 @@
 
 // Parameters
 // Number of Path-Traced Samples
-#define samples 128U
+#define samples 512U
 
 // Resolution
-#define resolutionx 640U
-#define resolutiony 480U
+#define resolutionx 1280U
+#define resolutiony 640U
 
 // Maximum Ray-Marches
 #define maxmarches 8192U
