@@ -168,7 +168,7 @@ int main(){
         for(unsigned int sample = 0U; sample < samples; sample++){
             INIT_RNG;
             ditheroffset = nrand2(0.5f, floatf2(0.0f));
-            uv = vec2Divf(vec2Multf(vec2Sub(vec2Addf(float2(x, y), 0.5f), vec2Multf(resolutionxy, 0.5f)), 2.0f), resolutionmax);
+            uv = vec2Divf(vec2Multf(vec2Sub(nrand2(0.5f, vec2Addf(float2(x, y), 0.5f)), vec2Multf(resolutionxy, 0.5f)), 2.0f), resolutionmax);
             raydir = normalize(float3(uv.x*camfov, uv.y*camfov, 1.0f));
             outCol = vec3Add(outCol, pathtrace(raydir, float3(0.0f, 0.0f, -2.0f)));
         }
