@@ -112,6 +112,14 @@ vec2 vec2Mult(vec2 x, vec2 y){
     return vec;
 }
 
+// Multiply a 2D Vector by a Float
+vec2 vec2Multf(vec2 x, float y){
+    vec2 vec;
+    vec.x = x.x*y;
+    vec.y = x.y*y;
+    return vec;
+}
+
 // Multiply Two 3D Vectors
 vec3 vec3Mult(vec3 x, vec3 y){
     vec3 vec;
@@ -121,11 +129,28 @@ vec3 vec3Mult(vec3 x, vec3 y){
     return vec;
 }
 
+// Multiply a 3D Vector by a Float
+vec3 vec3Multf(vec3 x, float y){
+    vec3 vec;
+    vec.x = x.x*y;
+    vec.y = x.y*y;
+    vec.z = x.z*y;
+    return vec;
+}
+
 // Divide Two 2D Vectors
 vec2 vec2Div(vec2 x, vec2 y){
     vec2 vec;
     vec.x = x.x/y.x;
     vec.y = x.y/y.y;
+    return vec;
+}
+
+// Divide a 2D Vector by a Float
+vec2 vec2Divf(vec2 x, float y){
+    vec2 vec;
+    vec.x = x.x/y;
+    vec.y = x.y/y;
     return vec;
 }
 
@@ -138,11 +163,28 @@ vec3 vec3Div(vec3 x, vec3 y){
     return vec;
 }
 
+// Divide a 3D Vector by a Float
+vec3 vec3Divf(vec3 x, float y){
+    vec3 vec;
+    vec.x = x.x/y;
+    vec.y = x.y/y;
+    vec.z = x.z/y;
+    return vec;
+}
+
 // Add Two 2D Vectors
 vec2 vec2Add(vec2 x, vec2 y){
     vec2 vec;
     vec.x = x.x+y.x;
     vec.y = x.y+y.y;
+    return vec;
+}
+
+// Add a Float to a 2D Vector
+vec2 vec2Addf(vec2 x, float y){
+    vec2 vec;
+    vec.x = x.x+y;
+    vec.y = x.y+y;
     return vec;
 }
 
@@ -201,7 +243,7 @@ vec3 normalize(vec3 vec){
 
 // Reflect a 3D Vector along a Normal
 vec3 reflect(vec3 vector, vec3 normal){
-    return vec3Sub(vector, vec3Mult(floatf3(2.0f*vec3dotp(vector, normal)), normal));
+    return vec3Sub(vector, vec3Multf(normal, 2.0f*vec3dotp(vector, normal)));
 }
 
 // Random Vectors
@@ -212,12 +254,12 @@ vec4 rand4(){return float4(random(), random(), random(), random());}
 // Sphereically Uniform Random Functions (Ported from: https://www.shadertoy.com/view/WttyWX)
 vec2 nrand2(float sigma, vec2 mean){
     vec2 Z = rand2();
-    return vec2Add(mean, vec2Mult(floatf2(sigma*sqrtf(-2.0f*logf(Z.x))), float2(cos(twopi*Z.y), sin(twopi*Z.y))));
+    return vec2Add(mean, vec2Multf(float2(cos(twopi*Z.y), sin(twopi*Z.y)), sigma*sqrtf(-2.0f*logf(Z.x))));
 }
 
 vec3 nrand3(float sigma, vec3 mean){
     vec4 Z = rand4();
     vec3 trig = float3(cos(twopi*Z.z), sin(twopi*Z.z), cos(twopi*Z.w));
     vec3 swiz = float3(Z.x, Z.x, Z.y);
-    return vec3Add(mean, vec3Mult(vec3Mult(floatf3(sigma), vec3sqrt(vec3Mult(floatf3(-2.0f), vec3log(swiz)))), trig));
+    return vec3Add(mean, vec3Mult(vec3Multf(vec3sqrt(vec3Multf(vec3log(swiz), -2.0f)), sigma), trig));
 }

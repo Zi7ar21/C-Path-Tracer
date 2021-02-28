@@ -9,7 +9,7 @@
 
 // Parameters
 // Number of Path-Traced Samples
-#define samples 128U
+#define samples 32U
 
 // Resolution
 #define resolutionx 640U
@@ -98,7 +98,7 @@ vec4 material(vec3 pos){
 vec3 fresnel(vec3 raydir, vec3 normal){
     // Specularity
     vec3 F0 = floatf3(0.8f);
-    return vec3Add(F0, vec3Mult(vec3Sub(floatf3(1.0f), F0), floatf3(powf(1.0f-vec3dotp(vec3Mult(raydir, floatf3(-1.0f)), normal), 5.0f))));
+    return vec3Add(F0, vec3Multf(vec3Sub(floatf3(1.0f), F0), powf(1.0f-vec3dotp(vec3Multf(raydir, -1.0f), normal), 5.0f)));
 }
 
 // Light Distance Estimator
@@ -144,20 +144,21 @@ vec3 pathtrace(vec3 raydir, vec3 rayori){
         // If our Ray didn't hit anything, move it forward as usual
         else{
             lastpos = raypos;
-            raypos = vec3Add(raypos, vec3Mult(raydir, floatf3(marchprecision*min(distest, light(raypos)))));
+            raypos = vec3Add(raypos, vec3Multf(raydir, marchprecision*min(distest, light(raypos))));
         }
     }
 
     // Return the sample illuminated by the background color
-    return vec3Mult(outCol, floatf3(0.5f));
+    return vec3Multf(outCol, 0.5f);
 }
 
 int main(){
     // Set-Up Variables
-    unsigned int resolutionmax = max(resolutionx, resolutiony), byte = 0U;
+    vec2 resolutionxy = float2(resolutionx, resolutiony);
+    int resolutionmax = max(resolutionx, resolutiony), byte = 0U;
     vec3 raydir, normal, outCol;
     vec2 uv, ditheroffset;
-    uint8_t imageBuffer[resolutionx * resolutiony * 3U] = {0U};
+    uint8_t imageBuffer[resolutionx*resolutiony*3U] = {0U};
 
     // Execute Rendering
     // Inverted Y, Because Targa Sucks... This originally used PPM but I was convinced otherwise, oh how foolish of me... lol
@@ -167,13 +168,13 @@ int main(){
         for(unsigned int sample = 0U; sample < samples; sample++){
             INIT_RNG;
             ditheroffset = nrand2(0.5f, floatf2(0.0f));
-            uv = float2(2.0f*(((x+0.5f)+ditheroffset.x)-0.5f*resolutionx)/resolutionmax, 2.0f*(((y+0.5f)+ditheroffset.y)-0.5f*resolutiony)/resolutionmax);
+            uv = vec2Divf(vec2Multf(vec2Sub(vec2Addf(float2(x, y), 0.5f), vec2Multf(resolutionxy, 0.5f)), 2.0f), resolutionmax);
             raydir = normalize(float3(uv.x*camfov, uv.y*camfov, 1.0f));
             outCol = vec3Add(outCol, pathtrace(raydir, float3(0.0f, 0.0f, -2.0f)));
         }
 
         // Divide the sum to get the converged sample
-        outCol = vec3Div(outCol, floatf3(samples));
+        outCol = vec3Divf(outCol, samples);
 
         // Add the pixels to the buffer
         imageBuffer[byte   ] = clamp(round(outCol.z*255U), 0U, 255U);
