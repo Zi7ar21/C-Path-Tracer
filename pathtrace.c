@@ -8,23 +8,53 @@
 #include "custommath.h"
 
 // Parameters
-#define samples     2048U
+// Number of Path-Traced Samples
+#define samples     128U
+
+// Resolution
 #define resolutionx 640U
 #define resolutiony 480U
-#define maxmarches  512U
+
+// Maximum Ray-Marches
+#define maxmarches  8192U
+
+// Maximum Path Bounces
+#define maxbounces  16U
+
+// Distance counted as a collision
 #define collisiondist 0.01f
-#define scenesize 2.5f
+#define lightcollisiondist 0.25f
+
+// Ray-March Step Multiplier
+#define marchprecision 0.5f
+
+// Maximum Distance from the Origin
+#define scenesize 4.0f
+
+// Camera Field of View
 #define camfov 1.0f
 
+// Sphere Distance Estimator
+float sphde(vec3 pos, vec3 sphpos, float sphrad){
+    return vector3Length(vec3Sub(pos, sphpos))-sphrad;
+}
+
+// Infinite Plane Distance Estimator
+float planede(vec3 pos, float height){
+    return pos.y-height;
+}
+
+// Scene Distance Estimator
 float distestimator(vec3 pos){
-    float sphere = vector3Length(pos)-0.5f;
-    float plane  = pos.y+0.5f;
+    float sphere = sphde(pos, floatf3(0.0f), 0.5f);
+    float plane  = planede(pos, -0.5f);
     return min(sphere, plane);
 }
 
+// Object Normal Lookup
 vec3 normal(vec3 pos){
-    float sphere = vector3Length(pos)-0.5f;
-    float plane  = pos.y+0.5f;
+    float sphere = sphde(pos, floatf3(0.0f), 0.5f);
+    float plane  = planede(pos, -0.5f);
     float minimumde = min(sphere, plane);
     if(minimumde == sphere){
         return normalize(pos);
@@ -35,9 +65,10 @@ vec3 normal(vec3 pos){
     return floatf3(0.0f);
 }
 
+// Material Lookup
 vec4 material(vec3 pos){
-    float sphere = vector3Length(pos)-0.5f;
-    float plane  = pos.y+0.5f;
+    float sphere = sphde(pos, floatf3(0.0f), 0.5f);
+    float plane  = planede(pos, -0.5f);
     float minimumde = min(sphere, plane);
     if(minimumde == sphere){
         return float4(1.0f, 0.2f, 0.2f, 0.5f);
@@ -48,23 +79,28 @@ vec4 material(vec3 pos){
     return floatf4(0.0f);
 }
 
+// Fresnel Reflectance
 vec3 fresnel(vec3 raydir, vec3 normal){
     vec3 F0 = floatf3(0.8f);
     return vec3Add(F0, vec3Mult(vec3Sub(floatf3(1.0f), F0), floatf3(powf(1.0f-vec3dotp(vec3Mult(raydir, floatf3(-1.0f)), normal), 5.0f))));
 }
 
+// Light Distance Estimator
 float light(vec3 pos){
-    return vector3Length(vec3Sub(pos, float3(-1.0f, 1.0f, -1.0f)))-0.25f;
+    return vector3Length(float3(pos.x*0.25f, 1.0f-pos.y, pos.z*0.25f))-0.125f;
 }
 
+// Scene Path-Tracing Function
 vec3 pathtrace(vec3 raydir, vec3 rayori){
+    unsigned int bounces = 0U;
     vec3 raypos = rayori, lastpos = rayori, outCol = floatf3(1.0f), normals;
     vec4 materialprops;
     float distest;
     for(unsigned int i = 0U; i < maxmarches; i++){
         if(vector3Length(raypos) > scenesize){break;}
-        if(light(raypos) < collisiondist+0.25f){
-            return vec3Mult(outCol, floatf3(8.0f));
+        if(bounces > maxbounces){return floatf3(0.0f);}
+        if(light(raypos) < lightcollisiondist){
+            return outCol;
         }
         distest = distestimator(raypos);
         if(distest < collisiondist){
@@ -74,10 +110,11 @@ vec3 pathtrace(vec3 raydir, vec3 rayori){
             // TODO: Spherically Uniform Random- Right now this is Basically a Cube which is Incorrect
             raydir = reflect(raydir, normalize(nrand3(materialprops.w, normals)));
             raypos = lastpos;
+            bounces++;
         }
         else{
             lastpos = raypos;
-            raypos = vec3Add(raypos, vec3Mult(raydir, floatf3(0.5f*min(distest, light(raypos)))));
+            raypos = vec3Add(raypos, vec3Mult(raydir, floatf3(marchprecision*min(distest, light(raypos)))));
         }
     }
     return vec3Mult(outCol, floatf3(0.5f));
@@ -91,7 +128,7 @@ int main(){
     uint8_t imageBuffer[resolutionx * resolutiony * 3U] = {0U};
 
     // Execute Rendering
-    // Inverted Y, Because Targa Sucks... THis originally used PPM but I was convinced otherwise, oh how foolish of me... lol
+    // Inverted Y, Because Targa Sucks... This originally used PPM but I was convinced otherwise, oh how foolish of me... lol
     for(unsigned int y = resolutiony; y > 0U; y--){
     for(unsigned int x = 0U; x < resolutionx; x++){
         // Monte-Carlo Rendering
@@ -108,7 +145,7 @@ int main(){
         imageBuffer[byte+2U] = clamp(round(outCol.x*255U), 0U, 255U);
         byte += 3U;
         // Update Progress Every 30 Bytes
-        if(0U == byte % 30U){printf("\r%d", byte/((resolutionx*resolutiony*3U)/100U));}
+        if(0U == byte % 300U){printf("\r%d", byte/((resolutionx*resolutiony*3U)/100U));}
     }
     }
     // Save the Image
