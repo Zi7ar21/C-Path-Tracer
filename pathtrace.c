@@ -54,24 +54,14 @@ float distestimator(vec3 pos){
     return min(sphere, plane);
 }
 
-// Object Normal Lookup
-vec3 normal(vec3 pos){
-    // Find the object the Ray collided with
-    float sphere = sphde(pos, floatf3(0.0f), 0.5f);
-    float plane  = planede(pos, -0.5f);
-    float minimumde = min(sphere, plane);
-
-    // Return the corresponding normal
-    if(minimumde == sphere){
-        return normalize(pos);
-    }
-
-    if(minimumde == plane){
-        return float3(0.0f, 1.0f, 0.0f);
-    }
-
-    // Return the undefined Normal (shouldn't happen, only to be on the safe side)
-    return floatf3(0.0f);
+// Calculate SDF Normals (Tetrahedron Technique Ported from: https://www.iquilezles.org/www/articles/normalsSDF/normalsSDF.htm)
+vec3 normal(vec3 p){
+    const vec2 k = float2(1.0f, -1.0f);
+    return normalize(vec3Add(
+    vec3Add(vec3Multf(float3 (k.x, k.y, k.y), distestimator(vec3Add(p, vec3Multf(float3 (k.x, k.y, k.y), collisiondist)))),
+    vec3Multf(        float3 (k.y, k.y, k.x), distestimator(vec3Add(p, vec3Multf(float3 (k.y, k.y, k.x), collisiondist))))),
+    vec3Add(vec3Multf(float3 (k.y, k.x, k.y), distestimator(vec3Add(p, vec3Multf(float3 (k.y, k.x, k.y), collisiondist)))),
+    vec3Multf(        floatf3(k.x          ), distestimator(vec3Add(p, vec3Multf(floatf3(k.x          ), collisiondist)))))));
 }
 
 // Material Lookup
@@ -154,10 +144,11 @@ vec3 pathtrace(vec3 raydir, vec3 rayori){
 
 int main(){
     // Set-Up Variables
-    vec2 resolutionxy = float2(resolutionx, resolutiony);
-    int resolutionmax = max(resolutionx, resolutiony), byte = 0U;
-    vec3 raydir, normal, outCol;
+    const unsigned int resolutionmax = max(resolutionx, resolutiony);
+    unsigned int byte = 0U;
+    const vec2 resolutionxy = float2(resolutionx, resolutiony);
     vec2 uv, ditheroffset;
+    vec3 raydir, normal, outCol;
     uint8_t imageBuffer[resolutionx*resolutiony*3U] = {0U};
 
     // Execute Rendering
