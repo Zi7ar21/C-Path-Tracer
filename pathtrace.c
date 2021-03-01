@@ -12,7 +12,7 @@
 #define camfov 1.0f
 
 // Number of Path-Traced Samples
-#define samples 32U
+#define samples 128U
 
 // Resolution
 #define resolutionx 640U
