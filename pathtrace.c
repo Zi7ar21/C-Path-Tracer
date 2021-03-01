@@ -8,6 +8,9 @@
 #include "custommath.h"
 
 // Parameters
+// Camera Field of View
+#define camfov 1.0f
+
 // Number of Path-Traced Samples
 #define samples 32U
 
@@ -21,18 +24,18 @@
 // Maximum Path Bounces
 #define maxbounces 16U
 
+// Maximum Sample Brightness
+#define maxluminance 10.0f
+
 // Distance counted as a collision
-#define collisiondist 0.01f
-#define lightcollisiondist 0.25f
+#define collisiondist 1e-2f
+#define lightcollisiondist 0.1f
 
 // Ray-March Step Multiplier
 #define marchprecision 0.5f
 
 // Maximum Distance from the Origin
 #define scenesize 4.0f
-
-// Camera Field of View
-#define camfov 1.0f
 
 // Sphere Distance Estimator
 float sphde(vec3 pos, vec3 sphpos, float sphrad){
@@ -145,10 +148,13 @@ vec3 pathtrace(vec3 raydir, vec3 rayori){
 int main(){
     // Set-Up Variables
     const unsigned int resolutionmax = max(resolutionx, resolutiony);
-    unsigned int byte = 0U;
+    unsigned int pixel = 0U;
     const vec2 resolutionxy = float2(resolutionx, resolutiony);
     vec2 uv, ditheroffset;
     vec3 raydir, normal, outCol;
+
+    // Image Buffers
+    vec3 pixels[resolutionx*resolutiony] = {floatf3(0.0f)};
     uint8_t imageBuffer[resolutionx*resolutiony*3U] = {0U};
 
     // Execute Rendering
@@ -166,16 +172,20 @@ int main(){
 
         // Divide the sum to get the converged sample
         outCol = vec3Divf(outCol, samples);
-
         // Add the pixels to the buffer
-        imageBuffer[byte   ] = clamp(round(outCol.z*255U), 0U, 255U);
-        imageBuffer[byte+1U] = clamp(round(outCol.y*255U), 0U, 255U);
-        imageBuffer[byte+2U] = clamp(round(outCol.x*255U), 0U, 255U);
-        byte += 3U;
+        pixels[pixel] = float3(clamp(outCol.x, 0.0f, maxluminance), clamp(outCol.y, 0.0f, maxluminance), clamp(outCol.z, 0.0f, maxluminance));
 
-        // Update Progress Display Every 300 Bytes
-        if(0U == byte % 300U){printf("\r%d", byte/((resolutionx*resolutiony*3U)/100U));}
+        // Update progress display every n Pixels
+        if(0U == pixel % 10U){printf("\r%d%%", pixel/(resolutionx*resolutiony/100U));}
+        pixel++;
     }
+    }
+
+    // Convert our High-Precision Float Buffer to Dumpable Bytes
+    for(pixel = 0U; pixel < resolutionx*resolutiony; pixel++){
+        imageBuffer[pixel*3U   ] = clamp(round(pixels[pixel].z*255U), 0U, 255U);
+        imageBuffer[pixel*3U+1U] = clamp(round(pixels[pixel].y*255U), 0U, 255U);
+        imageBuffer[pixel*3U+2U] = clamp(round(pixels[pixel].x*255U), 0U, 255U);
     }
 
     // Save the Image in the Targa format

@@ -50,6 +50,27 @@ typedef struct{
     float w;
 } vec4;
 
+/*// Double Precision 2D Vector
+typedef struct{
+    double x;
+    double y;
+} dvec2;
+
+// Double Precision 3D Vector
+typedef struct{
+    double x;
+    double y;
+    double z;
+} dvec3;
+
+// Double Precision 4D Vector
+typedef struct{
+    double x;
+    double y;
+    double z;
+    double w;
+} dvec4;*/
+
 // Convert 2 Floating-Point Numbers to a 2D Vector
 vec2 float2(float x, float y){
     vec2 vec;
