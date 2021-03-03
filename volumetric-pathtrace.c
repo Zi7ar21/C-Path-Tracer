@@ -12,136 +12,72 @@
 #define camfov 1.0f
 
 // Number of Path-Traced Samples
-#define samples 128U
+#define samples 1024U
 
 // Resolution
-#define resolutionx 640U
-#define resolutiony 480U
+#define resolutionx 320U
+#define resolutiony 240U
 
 // Maximum Ray-Marches
 #define maxmarches 8192U
 
 // Maximum Path Bounces
-#define maxbounces 16U
+#define maxbounces 32U
 
 // Maximum Sample Brightness
 #define maxluminance 10.0f
 
-// Distance counted as a collision
-#define collisiondist 1e-2f
-#define lightcollisiondist 0.1f
-
 // Ray-March Step Multiplier
-#define marchprecision 0.5f
+#define stepsize 0.125f*0.5f
 
 // Maximum Distance from the Origin
 #define scenesize 4.0f
 
-// Sphere Distance Estimator
-float sphde(vec3 pos, vec3 sphpos, float sphrad){
-    return vec3length(vec3Sub(pos, sphpos))-sphrad;
+vec4 densityfunction(vec3 pos){
+    return float4(1.0f, 1.0f, 1.0f, max((0.5f-vec3length(pos))*128.0f, 0.0f));
 }
 
-// Infinite Plane Distance Estimator
-float planede(vec3 pos, float height){
-    return pos.y-height;
-}
-
-// Scene Distance Estimator
-float distestimator(vec3 pos){
-    // Find the distance to all the objects in the scene
-    float sphere = sphde(pos, floatf3(0.0f), 0.5f);
-    float plane  = planede(pos, -0.5f);
-
-    // Return the nearest object's distance
-    return min(sphere, plane);
-}
-
-// Calculate SDF Normals (Tetrahedron Technique Ported from: https://www.iquilezles.org/www/articles/normalsSDF/normalsSDF.htm)
-vec3 normal(vec3 p){
-    const vec2 k = float2(1.0f, -1.0f);
-    return normalize(vec3Add(
-    vec3Add(vec3Multf(float3 (k.x, k.y, k.y), distestimator(vec3Add(p, vec3Multf(float3 (k.x, k.y, k.y), collisiondist)))),
-    vec3Multf(        float3 (k.y, k.y, k.x), distestimator(vec3Add(p, vec3Multf(float3 (k.y, k.y, k.x), collisiondist))))),
-    vec3Add(vec3Multf(float3 (k.y, k.x, k.y), distestimator(vec3Add(p, vec3Multf(float3 (k.y, k.x, k.y), collisiondist)))),
-    vec3Multf(        floatf3(k.x          ), distestimator(vec3Add(p, vec3Multf(floatf3(k.x          ), collisiondist)))))));
-}
-
-// Material Lookup
-vec4 material(vec3 pos){
-    // Find the object the Ray collided with
-    float sphere = sphde(pos, floatf3(0.0f), 0.5f);
-    float plane  = planede(pos, -0.5f);
-    float minimumde = min(sphere, plane);
-
-    // Return the corresponding material
-    if(minimumde == sphere){
-        return float4(1.0f, 0.2f, 0.2f, 0.5f);
-    }
-
-    if(minimumde == plane){
-        return float4(1.0f, 1.0f, 1.0f, 1.0f);
-    }
-
-    // Return the undefined material (shouldn't happen, only to be on the safe side)
-    return floatf4(0.0f);
-}
-
-// Fresnel Reflectance
-vec3 fresnel(vec3 raydir, vec3 normal){
-    // Specularity
-    vec3 F0 = floatf3(0.8f);
-    return vec3Add(F0, vec3Multf(vec3Sub(floatf3(1.0f), F0), powf(1.0f-vec3dotp(vec3Multf(raydir, -1.0f), normal), 5.0f)));
-}
-
-// Light Distance Estimator
+// Light
 float light(vec3 pos){
-    return vec3length(float3(pos.x*0.25f, 1.0f-pos.y, pos.z*0.25f))-0.125f;
+    return vec3length(vec3Sub(pos, float3(-1.0f, 1.0f, 1.0f)))-0.5f;
 }
 
 // Scene Path-Tracing Function
 vec3 pathtrace(vec3 raydir, vec3 rayori){
     // Set-Up Variables
     unsigned int bounces = 0U;
-    vec3 raypos = rayori, lastpos = rayori, outCol = floatf3(1.0f), normals;
-    vec4 materialprops;
-    float distest;
+    float absorbance, distancetravelled;
+    vec3 raypos = vec3Add(rayori, vec3Multf(raydir, stepsize*random())), attenuation = floatf3(1.0f);
+    vec4 density;
 
     // Perform Ray-Marching
     for(unsigned int i = 0U; i < maxmarches; i++){
+        // Check if we reached the light source
+        if(light(raypos) < 0.0f){
+            return vec3Multf(attenuation, 8.0f);
+        }
+
         // Check if our Ray escaped the scene
         if(vec3length(raypos) > scenesize){break;}
 
         // Check if our Ray bounced too many times
         if(bounces > maxbounces){return floatf3(0.0f);}
 
-        // Check if we reached the light source
-        if(light(raypos) < lightcollisiondist){
-            return outCol;
+        // Find the density of the point
+        density = densityfunction(raypos);
+        absorbance = expf(-density.w*stepsize);
+
+        // If our Ray decides to bounce, perform neccesary functions
+        if(absorbance < random()){
+            attenuation = vec3Mult(attenuation, float3(clamp(density.x*32.0f, 0.0f, 1.0f), clamp(density.y*32.0f, 0.0f, 1.0f), clamp(density.z*32.0f, 0.0f, 1.0f)));
+            raydir = normalize(nrand3(1.0f, floatf3(0.0f)));
         }
 
-        // Find the distance from our Ray to the scene
-        distest = distestimator(raypos);
-
-        // If our Ray hit something, perform neccesary functions
-        if(distest < collisiondist){
-            normals = normal(raypos);
-            materialprops = material(raypos);
-            outCol = vec3Mult(outCol, vec3Mult(fresnel(raydir, normals), float3(materialprops.x, materialprops.y, materialprops.z)));
-            raydir = reflect(raydir, normalize(nrand3(materialprops.w, normals)));
-            raypos = lastpos;
-            bounces++;
-        }
-
-        // If our Ray didn't hit anything, move it forward as usual
-        else{
-            lastpos = raypos;
-            raypos = vec3Add(raypos, vec3Multf(raydir, marchprecision*min(distest, light(raypos))));
-        }
+        raypos = vec3Add(raypos, vec3Multf(raydir, stepsize));
     }
 
     // Return the sample illuminated by the background color
-    return vec3Multf(outCol, 0.5f);
+    return floatf3(0.0f);
 }
 
 int main(){
@@ -189,7 +125,7 @@ int main(){
 
     // Save the Image in the Targa format
     FILE * imageFile;
-    imageFile = fopen ("render.tga", "wb");
+    imageFile = fopen ("volumerender.tga", "wb");
 
     // Prepare the Targa Image Header
     targaHeader header;
