@@ -12,23 +12,23 @@
 #define camfov 1.0f
 
 // Number of Path-Traced Samples
-#define samples 128U
+#define samples 32U
 
 // Resolution
 #define resolutionx 640U
-#define resolutiony 480U
+#define resolutiony 360U
 
 // Maximum Ray-Marches
-#define maxmarches 8192U
+#define maxmarches 1024U
 
 // Maximum Path Bounces
-#define maxbounces 16U
+#define maxbounces 32U
 
 // Maximum Sample Brightness
-#define maxluminance 10.0f
+#define maxluminance 3.5f
 
 // Distance counted as a collision
-#define collisiondist 1e-2f
+#define collisiondist 1e-4f
 #define lightcollisiondist 0.1f
 
 // Ray-March Step Multiplier
@@ -36,6 +36,11 @@
 
 // Maximum Distance from the Origin
 #define scenesize 4.0f
+
+// Mandelbulb DE Parameters
+/*#define iterations 4U
+#define bailout 4.0f
+#define power 8.0f*/
 
 // Sphere Distance Estimator
 float sphde(vec3 pos, vec3 sphpos, float sphrad){
@@ -47,14 +52,53 @@ float planede(vec3 pos, float height){
     return pos.y-height;
 }
 
+// Mandelbulb Distance Estimator
+/*// (Ported from:http://blog.hvidtfeldts.net/index.php/2011/09/distance-estimated-3d-fractals-v-the-mandelbulb-different-de-approximations/)
+float mandelbulb(vec3 pos){
+    if(vec3length(pos) > 1.5f){
+        return vec3length(pos)-1.35f;
+    }
+    vec3 z = float3(pos.x, pos.z, pos.y);
+    float dr = 1.0f;
+    float r = 0.0f;
+    for(unsigned int i = 0U; i < iterations; i++) {
+        r = vec3length(z);
+        if(r > bailout){break;}
+        // Convert to Polar Coordinates
+        float theta = acosf(z.z/r);
+        float phi = atan2f(z.y, z.x);
+        dr = powf(r, power-1.0f)*power*dr+1.0f;
+        // scale and rotate the point
+        float zr = powf(r, power);
+        theta = theta*power;
+        phi = phi*power;
+        // Convert back to cartesian coordinates
+        z = vec3Multf(float3(sinf(theta)*cosf(phi), sinf(phi)*sinf(theta), cosf(theta)), zr);
+        z = vec3Add(z, pos);
+    }
+    return 0.5f*logf(r)*r/dr;
+}*/
+
+float demoobject(vec3 pos){
+    if(sphde(pos, floatf3(0.0f), 0.5f) > 0.25){return sphde(pos, floatf3(0.0f), 0.6f);}
+    float sphere0 = sphde(pos, floatf3(0.0f), 0.5f);
+    float sphere1 = sphde(pos, float3 (0.125f, 0.0f, -0.125f), 0.5f);
+    float sphere2 = sphde(pos, floatf3(0.0f), 0.475f);
+    float sphere3 = sphde(pos, float3 (0.125f, 0.25f, -0.125f), 0.5f);
+    return max(-sphere3, min(max(-sphere1, sphere0), sphere2));
+}
+
 // Scene Distance Estimator
 float distestimator(vec3 pos){
     // Find the distance to all the objects in the scene
-    float sphere = sphde(pos, floatf3(0.0f), 0.5f);
-    float plane  = planede(pos, -0.5f);
+    //float DE0 = sphde(pos, float3(0.0f, 0.5f, 0.0f), 0.5f);
+    //float DE0 = mandelbulb(vec3Multf(pos, 2.0f))*0.5f;
+    float DE0 = demoobject(vec3Sub(pos, float3(0.0f, 0.5f, 0.0f)));
+    float DE1 = planede(pos, 0.0f);
+    float DE2 = sphde(pos, float3(0.0f, 0.5f, 0.0f), 0.46f);
 
     // Return the nearest object's distance
-    return min(sphere, plane);
+    return min(min(DE0, DE1), DE2);
 }
 
 // Calculate SDF Normals (Tetrahedron Technique Ported from: https://www.iquilezles.org/www/articles/normalsSDF/normalsSDF.htm)
@@ -70,17 +114,24 @@ vec3 normal(vec3 p){
 // Material Lookup
 vec4 material(vec3 pos){
     // Find the object the Ray collided with
-    float sphere = sphde(pos, floatf3(0.0f), 0.5f);
-    float plane  = planede(pos, -0.5f);
-    float minimumde = min(sphere, plane);
+    //float DE0 = sphde(pos, float3(0.0f, 0.5f, 0.0f), 0.5f);
+    //float DE0 = mandelbulb(vec3Multf(pos, 2.0f))*0.5f;
+    float DE0 = demoobject(vec3Sub(pos, float3(0.0f, 0.5f, 0.0f)));
+    float DE1 = planede(pos, 0.0f);
+    float DE2 = sphde(pos, float3(0.0f, 0.5f, 0.0f), 0.45f);
+    float minimumde = min(min(DE0, DE1), DE2);
 
     // Return the corresponding material
-    if(minimumde == sphere){
+    if(minimumde == DE0){
         return float4(1.0f, 0.2f, 0.2f, 0.5f);
     }
 
-    if(minimumde == plane){
+    if(minimumde == DE1){
         return float4(1.0f, 1.0f, 1.0f, 1.0f);
+    }
+
+    if(minimumde == DE2){
+        return float4(0.2f, 0.2f, 1.0f, 0.5f);
     }
 
     // Return the undefined material (shouldn't happen, only to be on the safe side)
@@ -90,13 +141,13 @@ vec4 material(vec3 pos){
 // Fresnel Reflectance
 vec3 fresnel(vec3 raydir, vec3 normal){
     // Specularity
-    vec3 F0 = floatf3(0.8f);
+    vec3 F0 = floatf3(0.95f);
     return vec3Add(F0, vec3Multf(vec3Sub(floatf3(1.0f), F0), powf(1.0f-vec3dotp(vec3Multf(raydir, -1.0f), normal), 5.0f)));
 }
 
 // Light Distance Estimator
 float light(vec3 pos){
-    return vec3length(float3(pos.x*0.25f, 1.0f-pos.y, pos.z*0.25f))-0.125f;
+    return vec3length(float3(pos.x*0.25f, 1.5f-pos.y, pos.z*0.25f))-0.125f;
 }
 
 // Scene Path-Tracing Function
@@ -166,7 +217,7 @@ int main(){
             ditheroffset = nrand2(0.5f, floatf2(0.0f));
             uv = vec2Divf(vec2Multf(vec2Sub(nrand2(0.5f, vec2Addf(float2(x, y), 0.5f)), vec2Multf(resolutionxy, 0.5f)), 2.0f), resolutionmax);
             raydir = normalize(float3(uv.x*camfov, uv.y*camfov, 1.0f));
-            outCol = vec3Add(outCol, pathtrace(raydir, float3(0.0f, 0.0f, -2.0f)));
+            outCol = vec3Add(outCol, pathtrace(raydir, float3(0.0f, 0.5f, -2.0f)));
         }
 
         // Divide the sum to get the converged sample
