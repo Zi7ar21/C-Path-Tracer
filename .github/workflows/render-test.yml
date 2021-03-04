@@ -13,4 +13,4 @@ jobs:
         - name: make
           run: make
         - name: render
-          run: time ./render
+          run: time ./render > render.log
