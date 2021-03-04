@@ -12,5 +12,7 @@ jobs:
         - uses: actions/checkout@v2
         - name: make
           run: make
-        - name: render
+        - name: render solid surface
           run: time ./render > render.log
+        - name: render volumetric
+          run: time ./volumerender > render.log

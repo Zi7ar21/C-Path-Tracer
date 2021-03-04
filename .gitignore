@@ -54,3 +54,6 @@ dkms.conf
 # IDE Folders
 .vscode
 builds
+
+# Windows Shid
+*.ini
