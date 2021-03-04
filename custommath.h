@@ -1,9 +1,11 @@
 #include <math.h>
 
+// ----- Constants -----
 // Yummy Pi!
 #define pi 3.1415926535897932384626433832795028841971693993751058209749445923078164
 #define twopi pi*2.0
 
+// ----- Math Utilities -----
 // Classic "Unsafe" Minimum and Maximum Functions
 // People on Stack Exchange said it was bad but it works Fine for me...
 #define min(a, b) (a < b ? a : b)
@@ -12,23 +14,7 @@
 // Clamp Function
 #define clamp(n, a, b) max(a, min(b, n))
 
-// High-Quality Random Numbers from Michael0884 (Ported from: https://www.shadertoy.com/view/wltcRS)
-unsigned int ns;
-#define INIT_RNG ns = 185730U*sample+(x+y*resolutionx);
-
-// The PRNG Algorithm
-void pcg(){
-    unsigned int state = ns*747796405U+2891336453U;
-    unsigned int word = ((state >> ((state >> 28U) + 4U)) ^ state)*277803737U;
-    ns = (word >> 22U) ^ word;
-}
-
-// Random Float between 0.0 and 1.0
-float random(){
-    pcg();
-    return (float)ns/(float)0xffffffffU;
-}
-
+// ----- Vector Utilities -----
 // 2D Vector
 typedef struct{
     float x;
@@ -49,27 +35,6 @@ typedef struct{
     float z;
     float w;
 } vec4;
-
-/*// Double Precision 2D Vector
-typedef struct{
-    double x;
-    double y;
-} dvec2;
-
-// Double Precision 3D Vector
-typedef struct{
-    double x;
-    double y;
-    double z;
-} dvec3;
-
-// Double Precision 4D Vector
-typedef struct{
-    double x;
-    double y;
-    double z;
-    double w;
-} dvec4;*/
 
 // Convert 2 Floating-Point Numbers to a 2D Vector
 vec2 float2(float x, float y){
@@ -265,6 +230,48 @@ vec3 normalize(vec3 vec){
 // Reflect a 3D Vector along a Normal
 vec3 reflect(vec3 vector, vec3 normal){
     return vec3Sub(vector, vec3Multf(normal, 2.0f*vec3dotp(vector, normal)));
+}
+
+// ----- Material Utilities -----
+// Material Data Type
+typedef struct{
+    vec3 col;
+    vec3 spec;
+    vec3 norm;
+    float rough;
+} material;
+
+// Create a Material
+material mat(vec3 color, vec3 specular, vec3 normal, float roughness){
+    material materialProperties;
+    materialProperties.col   = color;
+    materialProperties.spec  = specular;
+    materialProperties.norm  = normal;
+    materialProperties.rough = roughness;
+    return materialProperties;
+};
+
+// Fresnel Reflectance
+vec3 fresnel(vec3 raydir, vec3 normal, vec3 F0){
+    return vec3Add(F0, vec3Multf(vec3Sub(floatf3(1.0f), F0), powf(1.0f-vec3dotp(vec3Multf(raydir, -1.0f), normal), 5.0f)));
+}
+
+// ----- RNG Utilities -----
+// High-Quality Random Numbers from Michael0884 (Ported from: https://www.shadertoy.com/view/wltcRS)
+unsigned int ns;
+#define INIT_RNG ns = 185730U*sample+(x+y*resolutionx);
+
+// The PRNG Algorithm
+void pcg(){
+    unsigned int state = ns*747796405U+2891336453U;
+    unsigned int word = ((state >> ((state >> 28U) + 4U)) ^ state)*277803737U;
+    ns = (word >> 22U) ^ word;
+}
+
+// Random Float between 0.0 and 1.0
+float random(){
+    pcg();
+    return (float)ns/(float)0xffffffffU;
 }
 
 // Random Vectors

@@ -24,8 +24,8 @@
 // Maximum Path Bounces
 #define maxbounces 32U
 
-// Maximum Sample Brightness
-#define maxluminance 3.5f
+// Maximum Sample Brightness (Should be the light brightness)
+#define maxluminance 1.0f
 
 // Distance counted as a collision
 #define collisiondist 1e-4f
@@ -79,9 +79,10 @@ float mandelbulb(vec3 pos){
     return 0.5f*logf(r)*r/dr;
 }*/
 
-float demoobject(vec3 pos){
-    if(sphde(pos, floatf3(0.0f), 0.5f) > 0.25){return sphde(pos, floatf3(0.0f), 0.6f);}
+float demoObject(vec3 pos){
     float sphere0 = sphde(pos, floatf3(0.0f), 0.5f);
+    // If the ray is far away, skip finding the minimum of all the objects for speed
+    if(sphere0 > 0.25){return sphde(pos, floatf3(0.0f), 0.6f);}
     float sphere1 = sphde(pos, float3 (0.125f, 0.0f, -0.125f), 0.5f);
     float sphere2 = sphde(pos, floatf3(0.0f), 0.475f);
     float sphere3 = sphde(pos, float3 (0.125f, 0.25f, -0.125f), 0.5f);
@@ -93,7 +94,7 @@ float distestimator(vec3 pos){
     // Find the distance to all the objects in the scene
     //float DE0 = sphde(pos, float3(0.0f, 0.5f, 0.0f), 0.5f);
     //float DE0 = mandelbulb(vec3Multf(pos, 2.0f))*0.5f;
-    float DE0 = demoobject(vec3Sub(pos, float3(0.0f, 0.5f, 0.0f)));
+    float DE0 = demoObject(vec3Sub(pos, float3(0.0f, 0.5f, 0.0f)));
     float DE1 = planede(pos, 0.0f);
     float DE2 = sphde(pos, float3(0.0f, 0.5f, 0.0f), 0.46f);
 
@@ -102,7 +103,7 @@ float distestimator(vec3 pos){
 }
 
 // Calculate SDF Normals (Tetrahedron Technique Ported from: https://www.iquilezles.org/www/articles/normalsSDF/normalsSDF.htm)
-vec3 normal(vec3 p){
+vec3 calcNormal(vec3 p){
     const vec2 k = float2(1.0f, -1.0f);
     return normalize(vec3Add(
     vec3Add(vec3Multf(float3 (k.x, k.y, k.y), distestimator(vec3Add(p, vec3Multf(float3 (k.x, k.y, k.y), collisiondist)))),
@@ -112,37 +113,27 @@ vec3 normal(vec3 p){
 }
 
 // Material Lookup
-vec4 material(vec3 pos){
+material getMaterial(vec3 pos, vec3 normal){
     // Find the object the Ray collided with
     //float DE0 = sphde(pos, float3(0.0f, 0.5f, 0.0f), 0.5f);
     //float DE0 = mandelbulb(vec3Multf(pos, 2.0f))*0.5f;
-    float DE0 = demoobject(vec3Sub(pos, float3(0.0f, 0.5f, 0.0f)));
+    float DE0 = demoObject(vec3Sub(pos, float3(0.0f, 0.5f, 0.0f)));
     float DE1 = planede(pos, 0.0f);
     float DE2 = sphde(pos, float3(0.0f, 0.5f, 0.0f), 0.45f);
     float minimumde = min(min(DE0, DE1), DE2);
 
     // Return the corresponding material
-    if(minimumde == DE0){
-        return float4(1.0f, 0.2f, 0.2f, 0.5f);
-    }
+    // Object
+    if(minimumde == DE0){return mat(float3(1.0f, 0.2f, 0.2f), floatf3(0.95f), normal, 0.5f);}
 
-    if(minimumde == DE1){
-        return float4(1.0f, 1.0f, 1.0f, 1.0f);
-    }
+    // Plane
+    if(minimumde == DE1){return mat(float3(1.0f, 1.0f, 1.0f), floatf3(0.95f), normal, 1.0f);}
 
-    if(minimumde == DE2){
-        return float4(0.2f, 0.2f, 1.0f, 0.5f);
-    }
+    // Object Center
+    if(minimumde == DE2){return mat(float3(0.2f, 0.2f, 1.0f), floatf3(0.95f), normal, 0.5f);}
 
     // Return the undefined material (shouldn't happen, only to be on the safe side)
-    return floatf4(0.0f);
-}
-
-// Fresnel Reflectance
-vec3 fresnel(vec3 raydir, vec3 normal){
-    // Specularity
-    vec3 F0 = floatf3(0.95f);
-    return vec3Add(F0, vec3Multf(vec3Sub(floatf3(1.0f), F0), powf(1.0f-vec3dotp(vec3Multf(raydir, -1.0f), normal), 5.0f)));
+    return mat(floatf3(0.0f), normal, floatf3(0.0f), 0.0f);;
 }
 
 // Light Distance Estimator
@@ -154,8 +145,8 @@ float light(vec3 pos){
 vec3 pathtrace(vec3 raydir, vec3 rayori){
     // Set-Up Variables
     unsigned int bounces = 0U;
-    vec3 raypos = rayori, lastpos = rayori, outCol = floatf3(1.0f), normals;
-    vec4 materialprops;
+    vec3 raypos = rayori, lastpos = rayori, outCol = floatf3(1.0f), normal;
+    material objectMat;
     float distest;
 
     // Perform Ray-Marching
@@ -176,11 +167,11 @@ vec3 pathtrace(vec3 raydir, vec3 rayori){
 
         // If our Ray hit something, perform neccesary functions
         if(distest < collisiondist){
-            normals = normal(raypos);
-            materialprops = material(raypos);
-            outCol = vec3Mult(outCol, vec3Mult(fresnel(raydir, normals), float3(materialprops.x, materialprops.y, materialprops.z)));
-            raydir = reflect(raydir, normalize(nrand3(materialprops.w, normals)));
-            raypos = lastpos;
+            normal    = calcNormal(raypos);
+            objectMat = getMaterial(raypos, normal);
+            outCol    = vec3Mult(outCol, vec3Mult(fresnel(raydir, objectMat.norm, objectMat.spec), objectMat.col));
+            raydir    = reflect(raydir, normalize(nrand3(objectMat.rough, objectMat.norm)));
+            raypos    = lastpos;
             bounces++;
         }
 
@@ -200,11 +191,11 @@ int main(){
     const unsigned int resolutionmax = max(resolutionx, resolutiony);
     unsigned int pixel = 0U;
     const vec2 resolutionxy = float2(resolutionx, resolutiony);
-    vec2 uv, ditheroffset;
+    vec2 uv, ditherOffset;
     vec3 raydir, normal, outCol;
 
     // Image Buffers
-    vec3 pixels[resolutionx*resolutiony] = {floatf3(0.0f)};
+    vec3 pixels [resolutionx*resolutiony ] = {floatf3(0.0f)};
     uint8_t imageBuffer[resolutionx*resolutiony*3U] = {0U};
 
     // Execute Rendering
@@ -214,7 +205,7 @@ int main(){
         // Monte-Carlo Sampling
         for(unsigned int sample = 0U; sample < samples; sample++){
             INIT_RNG;
-            ditheroffset = nrand2(0.5f, floatf2(0.0f));
+            ditherOffset = nrand2(0.5f, floatf2(0.0f));
             uv = vec2Divf(vec2Multf(vec2Sub(nrand2(0.5f, vec2Addf(float2(x, y), 0.5f)), vec2Multf(resolutionxy, 0.5f)), 2.0f), resolutionmax);
             raydir = normalize(float3(uv.x*camfov, uv.y*camfov, 1.0f));
             outCol = vec3Add(outCol, pathtrace(raydir, float3(0.0f, 0.5f, -2.0f)));
