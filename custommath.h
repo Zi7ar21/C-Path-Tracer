@@ -200,6 +200,24 @@ vec3 vec3Sub(vec3 x, vec3 y){
     return vec;
 }
 
+// Clamp a 3D Vector by 2 3D Vectors
+vec3 vec3clamp(vec3 x, vec3 y, vec3 z){
+    vec3 vec;
+    vec.x = clamp(x.x, y.x, z.x);
+    vec.y = clamp(x.y, y.y, z.y);
+    vec.z = clamp(x.z, y.z, z.z);
+    return vec;
+}
+
+// Clamp a 3D Vector by a Float
+vec3 vec3clampf(vec3 x, float y, float z){
+    vec3 vec;
+    vec.x = clamp(x.x, y, z);
+    vec.y = clamp(x.y, y, z);
+    vec.z = clamp(x.z, y, z);
+    return vec;
+}
+
 // Find the Square Root of a 3D Vector
 vec3 vec3sqrt(vec3 vec){
     return float3(sqrtf(vec.x), sqrtf(vec.y), sqrtf(vec.z));

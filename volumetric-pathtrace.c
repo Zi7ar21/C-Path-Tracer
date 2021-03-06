@@ -15,11 +15,11 @@
 #define samples 1024U
 
 // Resolution
-#define resolutionx 320U
-#define resolutiony 240U
+#define resolutionx 640U
+#define resolutiony 360U
 
 // Maximum Ray-Marches
-#define maxmarches 8192U
+#define maxmarches 1024U
 
 // Maximum Path Bounces
 #define maxbounces 32U
@@ -28,18 +28,19 @@
 #define maxluminance 10.0f
 
 // Ray-March Step Multiplier
-#define stepsize 0.125f*0.5f
+#define stepsize 0.125f
 
 // Maximum Distance from the Origin
 #define scenesize 4.0f
 
+// Volumetric Density Function
 vec4 densityfunction(vec3 pos){
-    return float4(1.0f, 1.0f, 1.0f, max((0.5f-vec3length(pos))*128.0f, 0.0f));
+    return float4(0.2f, 0.6f, 1.0f, max((0.5f-vec3length(pos))*32.0f, 0.0f));
 }
 
 // Light
 float light(vec3 pos){
-    return vec3length(vec3Sub(pos, float3(-1.0f, 1.0f, 1.0f)))-0.5f;
+    return vec3length(vec3Sub(pos, float3(-1.0f, 1.0f, -1.0f)))-0.5f;
 }
 
 // Scene Path-Tracing Function
@@ -85,7 +86,7 @@ int main(){
     const unsigned int resolutionmax = max(resolutionx, resolutiony);
     unsigned int pixel = 0U;
     const vec2 resolutionxy = float2(resolutionx, resolutiony);
-    vec2 uv, ditheroffset;
+    vec2 uv;
     vec3 raydir, normal, outCol;
 
     // Image Buffers
@@ -99,7 +100,6 @@ int main(){
         // Monte-Carlo Sampling
         for(unsigned int sample = 0U; sample < samples; sample++){
             INIT_RNG;
-            ditheroffset = nrand2(0.5f, floatf2(0.0f));
             uv = vec2Divf(vec2Multf(vec2Sub(nrand2(0.5f, vec2Addf(float2(x, y), 0.5f)), vec2Multf(resolutionxy, 0.5f)), 2.0f), resolutionmax);
             raydir = normalize(float3(uv.x*camfov, uv.y*camfov, 1.0f));
             outCol = vec3Add(outCol, pathtrace(raydir, float3(0.0f, 0.0f, -2.0f)));
@@ -108,7 +108,7 @@ int main(){
         // Divide the sum to get the converged sample
         outCol = vec3Divf(outCol, samples);
         // Add the pixels to the buffer
-        pixels[pixel] = float3(clamp(outCol.x, 0.0f, maxluminance), clamp(outCol.y, 0.0f, maxluminance), clamp(outCol.z, 0.0f, maxluminance));
+        pixels[pixel] = vec3clampf(outCol, 0.0f, maxluminance);
 
         // Update progress display every n Pixels
         if(0U == pixel % 10U){printf("\r%d%%", pixel/(resolutionx*resolutiony/100U));}

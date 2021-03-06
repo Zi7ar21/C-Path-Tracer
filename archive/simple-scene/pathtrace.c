@@ -10,7 +10,7 @@
 // Parameters
 #define samples     2048U
 #define resolutionx 640U
-#define resolutiony 480U
+#define resolutiony 360U
 #define maxmarches  512U
 #define collisiondist 0.01f
 #define scenesize 2.5f

@@ -11,8 +11,8 @@ jobs:
         steps:
         - uses: actions/checkout@v2
         - name: make
-          run: make
-        - name: render solid surface
+          run: time make
+        - name: render normal scene
           run: time ./render > render.log
-        - name: render volumetric
+        - name: render volumetric scene
           run: time ./volumerender > render.log

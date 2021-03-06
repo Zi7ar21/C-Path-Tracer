@@ -191,7 +191,7 @@ int main(){
     const unsigned int resolutionmax = max(resolutionx, resolutiony);
     unsigned int pixel = 0U;
     const vec2 resolutionxy = float2(resolutionx, resolutiony);
-    vec2 uv, ditherOffset;
+    vec2 uv;
     vec3 raydir, normal, outCol;
 
     // Image Buffers
@@ -205,7 +205,6 @@ int main(){
         // Monte-Carlo Sampling
         for(unsigned int sample = 0U; sample < samples; sample++){
             INIT_RNG;
-            ditherOffset = nrand2(0.5f, floatf2(0.0f));
             uv = vec2Divf(vec2Multf(vec2Sub(nrand2(0.5f, vec2Addf(float2(x, y), 0.5f)), vec2Multf(resolutionxy, 0.5f)), 2.0f), resolutionmax);
             raydir = normalize(float3(uv.x*camfov, uv.y*camfov, 1.0f));
             outCol = vec3Add(outCol, pathtrace(raydir, float3(0.0f, 0.5f, -2.0f)));
@@ -214,7 +213,7 @@ int main(){
         // Divide the sum to get the converged sample
         outCol = vec3Divf(outCol, samples);
         // Add the pixels to the buffer
-        pixels[pixel] = float3(clamp(outCol.x, 0.0f, maxluminance), clamp(outCol.y, 0.0f, maxluminance), clamp(outCol.z, 0.0f, maxluminance));
+        pixels[pixel] = vec3clampf(outCol, 0.0f, maxluminance);
 
         // Update progress display every n Pixels
         if(0U == pixel % 10U){printf("\r%d%%", pixel/(resolutionx*resolutiony/100U));}
