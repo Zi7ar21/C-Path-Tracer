@@ -12,7 +12,5 @@ jobs:
         - uses: actions/checkout@v2
         - name: make
           run: time make
-        - name: render normal scene
+        - name: render the scene
           run: time ./render > render.log
-        - name: render volumetric scene
-          run: time ./volumerender > render.log
