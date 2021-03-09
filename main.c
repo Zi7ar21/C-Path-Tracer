@@ -12,7 +12,7 @@
 #define camfov 1.0f
 
 // Number of Path-Traced Samples
-#define samples 32U
+#define samples 512U
 
 // Resolution
 #define resolutionx 640U
@@ -28,32 +28,25 @@
 #define maxluminance 1.0f
 
 // Distance counted as a collision
-#define collisiondist 1e-4f
+#define collisiondist 1e-2f
 #define lightcollisiondist 0.1f
 
 // Ray-March Step Multiplier
-#define marchprecision 0.5f
+#define marchprecision 1.0f
 
 // Maximum Distance from the Origin
 #define scenesize 4.0f
 
-// Mandelbulb DE Parameters
-/*#define iterations 4U
+// FBM Noise Octaves
+#define octaves 4U
+
+/*// Mandelbulb DE Parameters
+#define iterations 4U
 #define bailout 4.0f
-#define power 8.0f*/
-
-// Sphere Distance Estimator
-float sphde(vec3 pos, vec3 sphpos, float sphrad){
-    return vec3length(vec3Sub(pos, sphpos))-sphrad;
-}
-
-// Infinite Plane Distance Estimator
-float planede(vec3 pos, float height){
-    return pos.y-height;
-}
+#define power 8.0f
 
 // Mandelbulb Distance Estimator
-/*// (Ported from:http://blog.hvidtfeldts.net/index.php/2011/09/distance-estimated-3d-fractals-v-the-mandelbulb-different-de-approximations/)
+// (Ported from:http://blog.hvidtfeldts.net/index.php/2011/09/distance-estimated-3d-fractals-v-the-mandelbulb-different-de-approximations/)
 float mandelbulb(vec3 pos){
     if(vec3length(pos) > 1.5f){
         return vec3length(pos)-1.35f;
@@ -79,27 +72,40 @@ float mandelbulb(vec3 pos){
     return 0.5f*logf(r)*r/dr;
 }*/
 
-float demoObject(vec3 pos){
-    float sphere0 = sphde(pos, floatf3(0.0f), 0.5f);
-    // If the ray is far away, skip finding the minimum of all the objects for speed
-    if(sphere0 > 0.25){return sphde(pos, floatf3(0.0f), 0.6f);}
-    float sphere1 = sphde(pos, float3 (0.125f, 0.0f, -0.125f), 0.5f);
-    float sphere2 = sphde(pos, floatf3(0.0f), 0.475f);
-    float sphere3 = sphde(pos, float3 (0.125f, 0.25f, -0.125f), 0.5f);
-    return max(-sphere3, min(max(-sphere1, sphere0), sphere2));
+// 3D FBM: https://www.shadertoy.com/view/3dSBRh
+float fbm(vec3 x){
+    float v = 0.0f;
+    float a = 0.5f;
+    for(unsigned int i = 0U; i < octaves; i++){
+        v += a*noise(x);
+        x = vec3Multf(x, 2.0f);
+        a *= 0.5f;
+    }
+    return v;
+}
+
+// Planet Distance Estimator
+float planetDE(vec3 pos){
+    float vectorLength = vec3length(pos);
+    // If the ray is far enough, we can skip the expensive noise computation
+    if(vectorLength-0.7f > 0.0f){
+        return vectorLength-0.6f;
+    }
+    float surfaceHeight = 0.1f*(fbm(vec3Multf(normalize(pos), 2.0f))-0.025f);
+    float displacement = surfaceHeight;
+    if(surfaceHeight < 0.0f){
+        displacement = 0.0f;
+    }
+    return vectorLength-0.5f-displacement;
 }
 
 // Scene Distance Estimator
 float distestimator(vec3 pos){
     // Find the distance to all the objects in the scene
-    //float DE0 = sphde(pos, float3(0.0f, 0.5f, 0.0f), 0.5f);
-    //float DE0 = mandelbulb(vec3Multf(pos, 2.0f))*0.5f;
-    float DE0 = demoObject(vec3Sub(pos, float3(0.0f, 0.5f, 0.0f)));
-    float DE1 = planede(pos, 0.0f);
-    float DE2 = sphde(pos, float3(0.0f, 0.5f, 0.0f), 0.46f);
+    float DE0 = planetDE(pos);
 
     // Return the nearest object's distance
-    return min(min(DE0, DE1), DE2);
+    return DE0;
 }
 
 // Calculate SDF Normals (Tetrahedron Technique Ported from: https://www.iquilezles.org/www/articles/normalsSDF/normalsSDF.htm)
@@ -115,30 +121,26 @@ vec3 calcNormal(vec3 p){
 // Material Lookup
 material getMaterial(vec3 pos, vec3 normal){
     // Find the object the Ray collided with
-    //float DE0 = sphde(pos, float3(0.0f, 0.5f, 0.0f), 0.5f);
-    //float DE0 = mandelbulb(vec3Multf(pos, 2.0f))*0.5f;
-    float DE0 = demoObject(vec3Sub(pos, float3(0.0f, 0.5f, 0.0f)));
-    float DE1 = planede(pos, 0.0f);
-    float DE2 = sphde(pos, float3(0.0f, 0.5f, 0.0f), 0.45f);
-    float minimumde = min(min(DE0, DE1), DE2);
+    //float DE0 = planetDE(pos);
+
+    // Return the nearest object's distance
+    //float minimumde = DE0;
 
     // Return the corresponding material
-    // Object
-    if(minimumde == DE0){return mat(float3(1.0f, 0.2f, 0.2f), floatf3(0.95f), normal, 0.5f);}
-
-    // Plane
-    if(minimumde == DE1){return mat(float3(1.0f, 1.0f, 1.0f), floatf3(0.95f), normal, 1.0f);}
-
-    // Object Center
-    if(minimumde == DE2){return mat(float3(0.2f, 0.2f, 1.0f), floatf3(0.95f), normal, 0.5f);}
+    // Planet
+    //if(minimumde == DE0){
+    if(fbm(vec3Multf(normalize(pos), 2.0f))-0.025f < 0.0f){
+        return mat(float3(0.8f, 0.8f, 1.0f), floatf3(0.4f), normal, 0.5f);
+    }
+    return mat(float3(0.6f, 1.0f, 0.6f), floatf3(0.8f), normal, 1.0f);
 
     // Return the undefined material (shouldn't happen, only to be on the safe side)
-    return mat(floatf3(0.0f), normal, floatf3(0.0f), 0.0f);;
+    return mat(floatf3(0.0f), normal, floatf3(0.0f), 0.0f);
 }
 
 // Light Distance Estimator
 float light(vec3 pos){
-    return vec3length(float3(pos.x*0.25f, 1.5f-pos.y, pos.z*0.25f))-0.125f;
+    return vec3length(vec3Sub(pos, float3(-1.0f, 1.0f, -1.0f)))-0.5f;
 }
 
 // Scene Path-Tracing Function
@@ -159,7 +161,7 @@ vec3 pathtrace(vec3 raydir, vec3 rayori){
 
         // Check if we reached the light source
         if(light(raypos) < lightcollisiondist){
-            return outCol;
+            return vec3Multf(outCol, 8.0f);
         }
 
         // Find the distance from our Ray to the scene
@@ -183,7 +185,7 @@ vec3 pathtrace(vec3 raydir, vec3 rayori){
     }
 
     // Return the sample illuminated by the background color
-    return vec3Multf(outCol, 0.5f);
+    return vec3Multf(outCol, 0.125f);
 }
 
 int main(){
@@ -195,11 +197,11 @@ int main(){
     vec3 raydir, normal, outCol;
 
     // Image Buffers
-    vec3 pixels [resolutionx*resolutiony ] = {floatf3(0.0f)};
+    vec3 pixels[resolutionx*resolutiony] = {floatf3(0.0f)};
     uint8_t imageBuffer[resolutionx*resolutiony*3U] = {0U};
 
     // Execute Rendering
-    // Inverted Y, Because Targa Sucks... This originally used PPM but I was convinced otherwise, oh how foolish of me... lol
+    // Inverted Y, Because Targa Sucks...
     for(unsigned int y = resolutiony; y > 0U; y--){
     for(unsigned int x = 0U; x < resolutionx; x++){
         // Monte-Carlo Sampling
@@ -207,11 +209,12 @@ int main(){
             INIT_RNG;
             uv = vec2Divf(vec2Multf(vec2Sub(nrand2(0.5f, vec2Addf(float2(x, y), 0.5f)), vec2Multf(resolutionxy, 0.5f)), 2.0f), resolutionmax);
             raydir = normalize(float3(uv.x*camfov, uv.y*camfov, 1.0f));
-            outCol = vec3Add(outCol, pathtrace(raydir, float3(0.0f, 0.5f, -2.0f)));
+            outCol = vec3Add(outCol, pathtrace(raydir, float3(0.0f, 0.0f, -2.0f)));
         }
 
-        // Divide the sum to get the converged sample
-        outCol = vec3Divf(outCol, samples);
+        // Divide the sum to get the converged sample, also Gamma-Correct it
+        outCol = vec3pow(vec3Divf(outCol, samples), 1.0f/2.2f);
+
         // Add the pixels to the buffer
         pixels[pixel] = vec3clampf(outCol, 0.0f, maxluminance);
 

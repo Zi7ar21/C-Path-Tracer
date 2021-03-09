@@ -23,11 +23,17 @@ cd examples
 cd repository-banner
 make
 cd ..
+cd simple-planet
+make
+cd ..
 cd sphere-boolean-ops
 make
 cd ..
 cd ..
 cd other-experiments
+cd cpp-experimental
+make
+cd ..
 cd mandelbrot
 make
 cd ..
