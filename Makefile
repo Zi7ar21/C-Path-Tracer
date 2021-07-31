@@ -1,2 +1,2 @@
 all:
-	${CC} main.c -o render -lm -O3
+	${CC} main.c -lm -Ofast -o render

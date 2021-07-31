@@ -1,7 +1,20 @@
-# C Path-Tracer
+# C-Path-Tracer
 
-This repository contains a Single-Threaded [Path-Tracer](https://en.wikipedia.org/wiki/Path_tracing) written in [C](https://en.wikipedia.org/wiki/C_(programming_language)). It runs on the CPU and saves the render as a [Truevision TGA (Targa) Image (`*.tga`)](https://en.wikipedia.org/wiki/Truevision_TGA) Image file on the disk. There is plans to make it Multithreaded and to use a different image format that supports better [color-depth](https://en.wikipedia.org/wiki/Color_depth). [Portable PixMap (`*.ppm`)](https://en.wikipedia.org/wiki/Netpbm) was a canidate but [GIMP](https://www.gimp.org) doesn't support 16-Bit Binary PPM.
+## Introduction
+
+This is the repository for my [Path Tracer](https://en.wikipedia.org/wiki/Path_tracing) written in C. It currently runs on the CPU, single-threaded, and saves the render in the [Targa Image File Format (`.tga`)](https://en.wikipedia.org/wiki/Truevision_TGA)
 
 ***
 
+## Sample Render
+
 ![Path-Traced rendering of a Red Sphere.](https://repository-images.githubusercontent.com/342092160/21fa9100-793c-11eb-9d6d-89c986825b63)
+
+***
+
+## TODO
+
+- Rendering Solid Surface and Volumetric objects in the same scene
+- Physically Accurate Rendering (There is currently no BRDF's and so this path tracer is considered biased.)
+- Multithreading
+- A better output image format (OpenEXR would be epic)
